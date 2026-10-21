@@ -62,41 +62,41 @@ jobs:
             https://github.com/LiBwrt/LibWrt.git \
             openwrt
      
-      - name: Diagnose feed installation
+    
+      - name: Diagnose config changes during feeds update
         run: |
           set -e
           cp .config openwrt/.config
           cd openwrt
 
-          echo "===== A. Before feeds update ====="
-          sha256sum .config
-          grep -n -E 'CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae)=' .config || true
+          echo "===== 1. Working directory and feeds script ====="
+          pwd
+          ls -l scripts/feeds
+          head -40 scripts/feeds
 
+          echo "===== 2. Save config before feeds update ====="
+          cp .config /tmp/config.before-feeds
+          stat .config
+          sha256sum .config
+
+          echo "===== 3. Run feeds update ====="
           ./scripts/feeds update -a
 
-          echo "===== B. After feeds update ====="
+          echo "===== 4. Config immediately after feeds update ====="
+          stat .config
           sha256sum .config
-          grep -n -E 'CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae)=' .config || true
 
-          ./scripts/feeds install -a
+          echo "===== 5. Exact config differences ====="
+          diff -u /tmp/config.before-feeds .config > /tmp/config.diff || true
+          wc -l /tmp/config.diff
+          sed -n '1,200p' /tmp/config.diff
 
-          echo "===== C. After feeds install ====="
-          sha256sum .config
-          ls -l .config
-          grep -n -E 'CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae)=' .config || true
+          echo "===== 6. Check package selections ====="
+          grep -n -E 'CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae)' .config || true
 
-          echo "===== D. Installed package links ====="
-          ls -ld package/feeds/luci/luci-app-openlist \
-                 package/feeds/luci/luci-app-dae \
-                 package/feeds/packages/openlist \
-                 package/feeds/packages/dae || true
+          echo "===== 7. Check working tree changes ====="
+          git status --short -- .config scripts/feeds
 
-          echo "===== E. Package Makefile config definitions ====="
-          grep -n -E '^(define Package/(luci-app-openlist|luci-app-dae|openlist|dae)(/[^)]*)?|config PACKAGE_)' \
-            feeds/luci/applications/luci-app-openlist/Makefile \
-            feeds/luci/applications/luci-app-dae/Makefile \
-            feeds/packages/net/openlist/Makefile \
-            feeds/packages/net/dae/Makefile || true
 
       - name: Download sources
         run: |
