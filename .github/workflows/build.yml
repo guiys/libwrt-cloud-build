@@ -67,22 +67,18 @@ jobs:
         run: |
           cd openwrt
 
-          echo "===== 1. Update and install feeds ====="
           ./scripts/feeds update -a
           ./scripts/feeds install -a
+          if [ -L package/feeds/luci/luci-app-weechat ]; then
+           rm package/feeds/luci/luci-app-weechat
+          fi
 
-          echo "===== 2. Restore your config ====="
           cp ../.config .config
 
-          echo "===== 3. Verify selected packages ====="
-          grep -E '^CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae)=y$' .config
 
-          echo "===== 4. Run defconfig ====="
           make defconfig
 
-          echo "===== 5. Verify selected packages after defconfig ====="
-          grep -E '^(CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae)=y|# CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae) is not set)' .config || true
-
+          grep -E '^CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae)=y$' .config
       - name: Download sources
         run: |
           cd openwrt
