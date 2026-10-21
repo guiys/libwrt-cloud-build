@@ -61,78 +61,32 @@ jobs:
             -b 25.12-nss \
             https://github.com/LiBwrt/LibWrt.git \
             openwrt
-
-
-     
       - name: Apply configuration
         run: |
           set -e
           cp .config openwrt/.config
           cd openwrt
 
-          echo "===== 1. Target and package config before feeds ====="
-          grep -E '^(CONFIG_TARGET|CONFIG_PACKAGE_(luci-app-weechat|weechat-full|weechat-minimal|luci-app-openlist|openlist|luci-app-dae|dae)=)' .config || true
+          echo "===== A. Immediately after copying config ====="
+          grep -E '^(CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae)=|# CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae) is not set)' .config || true
 
-          echo "===== 2. Update and install feeds ====="
           ./scripts/feeds update -a
           ./scripts/feeds install -a
-          echo "===== Temporarily exclude luci-app-weechat ====="
-          if [ -L package/feeds/luci/luci-app-weechat ]; then
-              rm package/feeds/luci/luci-app-weechat
-              echo "Removed luci-app-weechat feed symlink for diagnosis"
-          else
-              echo "Not a symlink; inspect package definition before changing it"
-              ls -ld package/feeds/luci/luci-app-weechat 2>/dev/null || true
-          fi
-          
-          echo "===== Check target packages before defconfig ====="
-          grep -E '^CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae)=' .config || true
-                    echo "===== 3. Check package definitions ====="
-                    find package/feeds feeds package \
-                      \( -iname '*openlist*' -o -iname '*dae*' -o -iname '*weechat*' \) \
-                      2>/dev/null | sort -u | head -150 || true
 
-          echo "===== 4. Check generated Kconfig dependencies ====="
-          if [ -f tmp/.config-package.in ]; then
-            grep -n -B 5 -A 10 -E \
-              'PACKAGE_luci-app-weechat|PACKAGE_weechat-full|PACKAGE_weechat-minimal' \
-              tmp/.config-package.in || true
-          else
-            echo "tmp/.config-package.in does not exist yet"
-          fi
+          echo "===== B. After feeds install ====="
+          grep -E '^(CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae)=|# CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae) is not set)' .config || true
 
-          echo "===== 5. Save config before defconfig ====="
-          cp .config /tmp/config.before-defconfig
+          echo "===== C. Package symbols in generated config ====="
+          grep -n -E 'PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae)' tmp/.config-package.in 2>/dev/null | head -80 || true
 
-          echo "===== 6. Run defconfig and capture exit code ====="
-          set +e
-          make defconfig 2>&1 | tee /tmp/make-defconfig.log
-          defconfig_status=${PIPESTATUS[0]}
-          set -e
+          echo "===== D. Run defconfig ====="
+          make defconfig
 
-          echo "make defconfig exit code: ${defconfig_status}"
+          echo "===== E. After defconfig ====="
+          grep -E '^(CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae)=|# CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae) is not set)' .config || true
 
-          echo "===== 7. Package config after defconfig ====="
-          grep -E '^(CONFIG_TARGET|CONFIG_PACKAGE_(luci-app-weechat|weechat-full|weechat-minimal|luci-app-openlist|openlist|luci-app-dae|dae)=)' .config || true
-
-          echo "===== 8. Relevant config differences ====="
-          diff -u /tmp/config.before-defconfig .config \
-            | grep -E '^[+-].*(TARGET|openlist|dae|weechat)' || true
-
-          echo "===== 9. Kconfig error summary ====="
-          grep -ni -E 'recursive dependency|error:|warning:' \
-            /tmp/make-defconfig.log | head -100 || true
-
-          echo "===== 10. Defconfig result ====="
-          if [ "$defconfig_status" -ne 0 ]; then
-            echo "ERROR: make defconfig failed"
-            exit "$defconfig_status"
-          fi
-
-          echo "make defconfig returned success; inspect package selections above."
-
-
-
+     
+     
       - name: Download sources
         run: |
           cd openwrt
