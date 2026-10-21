@@ -76,11 +76,21 @@ jobs:
           echo "===== 2. Update and install feeds ====="
           ./scripts/feeds update -a
           ./scripts/feeds install -a
-
-          echo "===== 3. Check package definitions ====="
-          find package/feeds feeds package \
-            \( -iname '*openlist*' -o -iname '*dae*' -o -iname '*weechat*' \) \
-            2>/dev/null | sort -u | head -150 || true
+          echo "===== Temporarily exclude luci-app-weechat ====="
+          if [ -L package/feeds/luci/luci-app-weechat ]; then
+              rm package/feeds/luci/luci-app-weechat
+              echo "Removed luci-app-weechat feed symlink for diagnosis"
+          else
+              echo "Not a symlink; inspect package definition before changing it"
+              ls -ld package/feeds/luci/luci-app-weechat 2>/dev/null || true
+          fi
+          
+          echo "===== Check target packages before defconfig ====="
+          grep -E '^CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae)=' .config || true
+                    echo "===== 3. Check package definitions ====="
+                    find package/feeds feeds package \
+                      \( -iname '*openlist*' -o -iname '*dae*' -o -iname '*weechat*' \) \
+                      2>/dev/null | sort -u | head -150 || true
 
           echo "===== 4. Check generated Kconfig dependencies ====="
           if [ -f tmp/.config-package.in ]; then
