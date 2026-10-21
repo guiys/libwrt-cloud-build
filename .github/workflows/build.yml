@@ -61,7 +61,12 @@ jobs:
             -b 25.12-nss \
             https://github.com/LiBwrt/LibWrt.git \
             openwrt
-     
+
+      - name: Cache OpenWrt build
+        uses: HiGarfield/cachewrtbuild@main
+        with:
+          ccache: 'true'
+          prefix: openwrt     
     
       - name: Apply configuration
         run: |
@@ -87,7 +92,7 @@ jobs:
       - name: Compile firmware
         run: |
           cd openwrt
-          make -j$(nproc) 
+          make -j$(nproc) V=s
 
       - name: Upload firmware
         if: always()
