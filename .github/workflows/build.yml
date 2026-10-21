@@ -82,12 +82,12 @@ jobs:
       - name: Download sources
         run: |
           cd openwrt
-#          make download -j4
+          make download -j4
 
       - name: Compile firmware
         run: |
           cd openwrt
-#          make -j$(nproc) V=s
+          make -j$(nproc) 
 
       - name: Upload firmware
         if: always()
