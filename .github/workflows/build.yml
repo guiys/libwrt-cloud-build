@@ -63,40 +63,25 @@ jobs:
             openwrt
      
     
-      - name: Diagnose config changes during feeds update
+      - name: Apply configuration
         run: |
-          set -e
-          cp .config openwrt/.config
           cd openwrt
 
-          echo "===== 1. Working directory and feeds script ====="
-          pwd
-          ls -l scripts/feeds
-          head -40 scripts/feeds
-
-          echo "===== 2. Save config before feeds update ====="
-          cp .config /tmp/config.before-feeds
-          stat .config
-          sha256sum .config
-
-          echo "===== 3. Run feeds update ====="
+          echo "===== 1. Update and install feeds ====="
           ./scripts/feeds update -a
+          ./scripts/feeds install -a
 
-          echo "===== 4. Config immediately after feeds update ====="
-          stat .config
-          sha256sum .config
+          echo "===== 2. Restore your config ====="
+          cp ../.config .config
 
-          echo "===== 5. Exact config differences ====="
-          diff -u /tmp/config.before-feeds .config > /tmp/config.diff || true
-          wc -l /tmp/config.diff
-          sed -n '1,200p' /tmp/config.diff
+          echo "===== 3. Verify selected packages ====="
+          grep -E '^CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae)=y$' .config
 
-          echo "===== 6. Check package selections ====="
-          grep -n -E 'CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae)' .config || true
+          echo "===== 4. Run defconfig ====="
+          make defconfig
 
-          echo "===== 7. Check working tree changes ====="
-          git status --short -- .config scripts/feeds
-
+          echo "===== 5. Verify selected packages after defconfig ====="
+          grep -E '^(CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae)=y|# CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae) is not set)' .config || true
 
       - name: Download sources
         run: |
