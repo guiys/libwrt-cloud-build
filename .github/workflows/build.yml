@@ -37,7 +37,7 @@ jobs:
           free -h
 
       - name: Install build dependencies
-         run: |
+        run: |
           sudo apt-get clean
           sudo rm -rf /var/lib/apt/lists/*
           sudo apt-get update
