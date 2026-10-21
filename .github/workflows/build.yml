@@ -37,9 +37,11 @@ jobs:
           free -h
 
       - name: Install build dependencies
-        run: |
+         run: |
+          sudo apt-get clean
+          sudo rm -rf /var/lib/apt/lists/*
           sudo apt-get update
-          sudo apt-get install -y \
+          sudo apt-get install -y --no-install-recommends \
             build-essential clang flex bison g++ gawk \
             gcc-multilib g++-multilib gettext git \
             libncurses-dev libssl-dev python3 \
@@ -52,6 +54,8 @@ jobs:
             msmtp nano ninja-build p7zip-full patch \
             pkgconf qemu-utils subversion swig \
             texinfo uglifyjs upx-ucl xmlto xxd
+          sudo apt-get clean
+          df -h
 
       - name: Clone latest LiBwrt source
         run: |
