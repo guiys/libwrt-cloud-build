@@ -61,32 +61,43 @@ jobs:
             -b 25.12-nss \
             https://github.com/LiBwrt/LibWrt.git \
             openwrt
-      - name: Apply configuration
+     
+      - name: Diagnose feed installation
         run: |
           set -e
           cp .config openwrt/.config
           cd openwrt
 
-          echo "===== A. Immediately after copying config ====="
-          grep -E '^(CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae)=|# CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae) is not set)' .config || true
+          echo "===== A. Before feeds update ====="
+          sha256sum .config
+          grep -n -E 'CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae)=' .config || true
 
           ./scripts/feeds update -a
+
+          echo "===== B. After feeds update ====="
+          sha256sum .config
+          grep -n -E 'CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae)=' .config || true
+
           ./scripts/feeds install -a
 
-          echo "===== B. After feeds install ====="
-          grep -E '^(CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae)=|# CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae) is not set)' .config || true
+          echo "===== C. After feeds install ====="
+          sha256sum .config
+          ls -l .config
+          grep -n -E 'CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae)=' .config || true
 
-          echo "===== C. Package symbols in generated config ====="
-          grep -n -E 'PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae)' tmp/.config-package.in 2>/dev/null | head -80 || true
+          echo "===== D. Installed package links ====="
+          ls -ld package/feeds/luci/luci-app-openlist \
+                 package/feeds/luci/luci-app-dae \
+                 package/feeds/packages/openlist \
+                 package/feeds/packages/dae || true
 
-          echo "===== D. Run defconfig ====="
-          make defconfig
+          echo "===== E. Package Makefile config definitions ====="
+          grep -n -E '^(define Package/(luci-app-openlist|luci-app-dae|openlist|dae)(/[^)]*)?|config PACKAGE_)' \
+            feeds/luci/applications/luci-app-openlist/Makefile \
+            feeds/luci/applications/luci-app-dae/Makefile \
+            feeds/packages/net/openlist/Makefile \
+            feeds/packages/net/dae/Makefile || true
 
-          echo "===== E. After defconfig ====="
-          grep -E '^(CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae)=|# CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae) is not set)' .config || true
-
-     
-     
       - name: Download sources
         run: |
           cd openwrt
