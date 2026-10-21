@@ -63,25 +63,64 @@ jobs:
             openwrt
 
 
+     
       - name: Apply configuration
         run: |
+          set -e
           cp .config openwrt/.config
           cd openwrt
 
-          echo "===== 1. Config before feeds ====="
-          grep -Ei 'openlist|dae|daed' .config || true
+          echo "===== 1. Target and package config before feeds ====="
+          grep -E '^(CONFIG_TARGET|CONFIG_PACKAGE_(luci-app-weechat|weechat-full|weechat-minimal|luci-app-openlist|openlist|luci-app-dae|dae)=)' .config || true
 
+          echo "===== 2. Update and install feeds ====="
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-          echo "===== 2. Check package definitions ====="
-          find package/feeds feeds package -iname '*openlist*' -o -iname '*dae*' 2>/dev/null | head -100 || true
+          echo "===== 3. Check package definitions ====="
+          find package/feeds feeds package \
+            \( -iname '*openlist*' -o -iname '*dae*' -o -iname '*weechat*' \) \
+            2>/dev/null | sort -u | head -150 || true
 
-          echo "===== 3. Run defconfig ====="
-          make defconfig
+          echo "===== 4. Check generated Kconfig dependencies ====="
+          if [ -f tmp/.config-package.in ]; then
+            grep -n -B 5 -A 10 -E \
+              'PACKAGE_luci-app-weechat|PACKAGE_weechat-full|PACKAGE_weechat-minimal' \
+              tmp/.config-package.in || true
+          else
+            echo "tmp/.config-package.in does not exist yet"
+          fi
 
-          echo "===== 4. Config after defconfig ====="
-          grep -Ei 'openlist|dae|daed' .config || true
+          echo "===== 5. Save config before defconfig ====="
+          cp .config /tmp/config.before-defconfig
+
+          echo "===== 6. Run defconfig and capture exit code ====="
+          set +e
+          make defconfig 2>&1 | tee /tmp/make-defconfig.log
+          defconfig_status=${PIPESTATUS[0]}
+          set -e
+
+          echo "make defconfig exit code: ${defconfig_status}"
+
+          echo "===== 7. Package config after defconfig ====="
+          grep -E '^(CONFIG_TARGET|CONFIG_PACKAGE_(luci-app-weechat|weechat-full|weechat-minimal|luci-app-openlist|openlist|luci-app-dae|dae)=)' .config || true
+
+          echo "===== 8. Relevant config differences ====="
+          diff -u /tmp/config.before-defconfig .config \
+            | grep -E '^[+-].*(TARGET|openlist|dae|weechat)' || true
+
+          echo "===== 9. Kconfig error summary ====="
+          grep -ni -E 'recursive dependency|error:|warning:' \
+            /tmp/make-defconfig.log | head -100 || true
+
+          echo "===== 10. Defconfig result ====="
+          if [ "$defconfig_status" -ne 0 ]; then
+            echo "ERROR: make defconfig failed"
+            exit "$defconfig_status"
+          fi
+
+          echo "make defconfig returned success; inspect package selections above."
+
 
 
       - name: Download sources
