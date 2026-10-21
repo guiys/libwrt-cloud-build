@@ -62,23 +62,37 @@ jobs:
             https://github.com/LiBwrt/LibWrt.git \
             openwrt
 
+
       - name: Apply configuration
         run: |
           cp .config openwrt/.config
           cd openwrt
+
+          echo "===== 1. Config before feeds ====="
+          grep -Ei 'openlist|dae|daed' .config || true
+
           ./scripts/feeds update -a
           ./scripts/feeds install -a
+
+          echo "===== 2. Check package definitions ====="
+          find package/feeds feeds package -iname '*openlist*' -o -iname '*dae*' 2>/dev/null | head -100 || true
+
+          echo "===== 3. Run defconfig ====="
           make defconfig
+
+          echo "===== 4. Config after defconfig ====="
+          grep -Ei 'openlist|dae|daed' .config || true
+
 
       - name: Download sources
         run: |
           cd openwrt
-          make download -j4
+#          make download -j4
 
       - name: Compile firmware
         run: |
           cd openwrt
-          make -j$(nproc) V=s
+#          make -j$(nproc) V=s
 
       - name: Upload firmware
         if: always()
