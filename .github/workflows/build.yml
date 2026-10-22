@@ -90,11 +90,27 @@ jobs:
             https://github.com/LiBwrt/LibWrt.git \
             openwrt
 
-      - name: Cache OpenWrt build
-        uses: HiGarfield/cachewrtbuild@main
+
+      - name: Prepare cache directories
+        run: |
+          mkdir -p openwrt/dl openwrt/.ccache
+
+      - name: Cache OpenWrt downloads
+        uses: actions/cache@v4
         with:
-          ccache: 'true'
-          prefix: openwrt     
+          path: openwrt/dl
+          key: openwrt-dl-25.12-nss-${{ hashFiles('.config') }}
+          restore-keys: |
+            openwrt-dl-25.12-nss-
+
+      - name: Cache C/C++ compiler
+        uses: actions/cache@v4
+        with:
+          path: openwrt/.ccache
+          key: openwrt-ccache-ipq807x-${{ hashFiles('.config') }}
+          restore-keys: |
+            openwrt-ccache-ipq807x-
+
     
       - name: Apply configuration
         run: |
@@ -108,6 +124,7 @@ jobs:
 
           cp ../.config .config
 
+          grep -q '^CONFIG_CCACHE=y$' .config || echo 'CONFIG_CCACHE=y' >> .config
 
           make defconfig
 
@@ -120,7 +137,11 @@ jobs:
       - name: Compile firmware
         run: |
           cd openwrt
-          make -j$(nproc) V=s
+          export CCACHE_DIR="$PWD/.ccache"
+          ccache -M 1G
+          ccache -s
+          make -j$(nproc)
+          ccache -s
 
       - name: Upload firmware
         if: always()
