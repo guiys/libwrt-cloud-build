@@ -95,13 +95,6 @@ jobs:
         run: |
           mkdir -p openwrt/dl openwrt/.ccache
 
-      - name: Cache OpenWrt downloads
-        uses: actions/cache@v4
-        with:
-          path: openwrt/dl
-          key: openwrt-dl-25.12-nss-${{ hashFiles('.config') }}
-          restore-keys: |
-            openwrt-dl-25.12-nss-
 
       - name: Cache C/C++ compiler
         uses: actions/cache@v4
