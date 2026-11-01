@@ -1,3 +1,4 @@
+
 name: Build LiBwrt Firmware
 
 on:
@@ -14,9 +15,23 @@ jobs:
     steps:
       - name: Initialization Environment
         run: |
-          sudo docker image prune -af || true
+          # 删除 Docker 镜像
+          docker images -q | xargs -r sudo docker rmi -f || true
+
+          # 清理预装的大型开发环境
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+          # 卸载当前固件编译不需要的软件
+          sudo apt-get purge -y \
+            'azure-cli' 'ghc*' 'zulu*' 'llvm*' \
+            'firefox*' 'google*' 'dotnet*' \
+            'powershell*' 'openjdk*' 'mongodb*' \
+            'moby*' || true
+
+          sudo apt-get autoremove --purge -y
           sudo apt-get clean
-          sudo rm -rf /var/lib/apt/lists/*
 
           echo "===== Disk before expansion ====="
           df -hT
@@ -24,8 +39,8 @@ jobs:
       - name: Maximize build space
         uses: easimon/maximize-build-space@v10
         with:
-          root-reserve-mb: 4096
-          temp-reserve-mb: 1024
+          root-reserve-mb: 1024
+          temp-reserve-mb: 100
           swap-size-mb: 1024
           remove-dotnet: "true"
           remove-android: "true"
@@ -35,15 +50,9 @@ jobs:
 
       - name: Check disk after expansion
         run: |
-          echo "===== Root filesystem ====="
-          df -hT /
-
-          echo "===== Runner directories ====="
-          df -hT /home/runner
-          df -hT "$GITHUB_WORKSPACE"
-
-          echo "===== Inode usage ====="
+          df -hT
           df -ih
+         
 
       - name: Checkout configuration
         uses: actions/checkout@v4
@@ -58,7 +67,6 @@ jobs:
           sudo apt-get clean
           sudo rm -rf /var/lib/apt/lists/*
           sudo apt-get update
-
           sudo apt-get install -y --no-install-recommends \
             build-essential clang flex bison g++ gawk \
             gcc-multilib g++-multilib gettext git \
@@ -72,11 +80,7 @@ jobs:
             msmtp nano ninja-build p7zip-full patch \
             pkgconf qemu-utils subversion swig \
             texinfo uglifyjs upx-ucl xmlto xxd
-
           sudo apt-get clean
-          sudo rm -rf /var/lib/apt/lists/*
-
-          echo "===== Disk after dependencies ====="
           df -h
 
       - name: Clone latest LiBwrt source
@@ -86,14 +90,11 @@ jobs:
             https://github.com/LiBwrt/LibWrt.git \
             openwrt
 
-          sed -i 's#^src-git packages .*#src-git packages https://github.com/immortalwrt/packages.git;master#' openwrt/feeds.conf.default
-
-          echo "===== Packages feed ====="
-          grep '^src-git packages ' openwrt/feeds.conf.default
 
       - name: Prepare cache directories
         run: |
           mkdir -p openwrt/dl openwrt/.ccache
+
 
       - name: Cache C/C++ compiler
         uses: actions/cache@v4
@@ -103,19 +104,16 @@ jobs:
           restore-keys: |
             openwrt-ccache-ipq807x-
 
+    
       - name: Apply configuration
         run: |
           cd openwrt
 
           ./scripts/feeds update -a
           ./scripts/feeds install -a
-
           if [ -L package/feeds/luci/luci-app-weechat ]; then
-            rm package/feeds/luci/luci-app-weechat
+           rm package/feeds/luci/luci-app-weechat
           fi
-
-          echo "===== Packages branch ====="
-          git -C feeds/packages branch --show-current
 
           cp ../.config .config
 
@@ -123,38 +121,20 @@ jobs:
 
           make defconfig
 
-          echo "===== Verify configuration ====="
           grep -E '^CONFIG_PACKAGE_(luci-app-openlist|openlist|luci-app-dae|dae)=y$' .config
-
-          echo "===== Disk after feeds ====="
-          df -h
-
       - name: Download sources
         run: |
           cd openwrt
           make download -j4
-          echo "===== Disk after download ====="
-          df -h
 
       - name: Compile firmware
         run: |
           cd openwrt
-
           export CCACHE_DIR="$PWD/.ccache"
-
           ccache -M 1G
           ccache -s
-
-          echo "===== Disk before compile ====="
-          df -h
-
           make -j$(nproc)
-
-          echo "===== Ccache statistics ====="
           ccache -s
-
-          echo "===== Disk after compile ====="
-          df -h
 
       - name: Upload firmware
         if: always()
