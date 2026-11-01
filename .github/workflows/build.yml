@@ -89,7 +89,7 @@ jobs:
             -b 25.12-nss \
             https://github.com/LiBwrt/LibWrt.git \
             openwrt
-
+            sed -i 's#^src-git packages .*#src-git packages https://github.com/immortalwrt/packages.git;master#' openwrt/feeds.conf.default
 
       - name: Prepare cache directories
         run: |
